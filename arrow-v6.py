@@ -6,10 +6,27 @@ import trafilatura
 import httpx
 from flashrank import Ranker, RerankRequest
 from urllib.parse import urlparse
+import os
+from fastapi import FastAPI, Query, Depends, HTTPException, Security
+from fastapi.security import APIKeyHeader
 
+app = FastAPI(title="ARROW API")
+
+API_KEY_NAME = "X-API-KEY"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+SHADOW_TAVILY_KEY = os.getenv("SHADOW_TAVILY_KEY", "local_development_fallback_key")
+
+async def verify_api_key(api_key: str = Security(api_key_header)):
+    if api_key != SHADOW_TAVILY_KEY:
+        raise HTTPException(
+            status_code=403, 
+            detail="Could not validate credentials. Missing or invalid X-API-KEY header."
+        )
+    return api_key
+    
 app = FastAPI(title="ShadowTavily API", description="AI-native search engine (Bulletproof Edition)")
 
-# Initialize the ultra-lightweight Ranker model
 ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2", cache_dir="/tmp")
 
 async def scrape_url(client: httpx.AsyncClient, url: str) -> str:
@@ -65,7 +82,6 @@ async def search(query: str = Query(..., description="The search query for the L
     except Exception:
         pass
 
-    # 3. Fallback to standard text search if News is dry
     if not raw_results:
         try:
             with DDGS() as ddgs:
@@ -79,7 +95,6 @@ async def search(query: str = Query(..., description="The search query for the L
     if not raw_results:
         return {"query": query, "results": [], "info": "No raw index hits."}
 
-    # Normalize keys because .news() uses 'url' and .text() uses 'href'
     targets = []
     for item in raw_results:
         url = item.get('url') or item.get('href')
@@ -88,12 +103,10 @@ async def search(query: str = Query(..., description="The search query for the L
         if url and title:
             targets.append({"url": url, "title": title, "body": body})
 
-    # 4. Scrape concurrently
     async with httpx.AsyncClient(follow_redirects=True) as client:
         tasks = [scrape_url(client, t['url']) for t in targets]
         scraped_contents = await asyncio.gather(*tasks)
 
-    # 5. Build chunks
     passages = []
     id_counter = 0
     for item, content in zip(targets, scraped_contents):
@@ -107,7 +120,6 @@ async def search(query: str = Query(..., description="The search query for the L
             })
             id_counter += 1
 
-    # 6. Rerank
     if passages:
         rerank_request = RerankRequest(query=query, passages=passages)
         reranked_results = ranker.rerank(rerank_request)[:5]
