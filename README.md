@@ -7,7 +7,7 @@ compressed into one python file for easy use
 <img width="353" height="66" alt="Screenshot 2026-05-25 at 9 04 14 PM" src="https://github.com/user-attachments/assets/018dfa42-907c-4155-b147-1c0bb0fba782" />
 
 
-## How to Use
+## How to Use 
 1. clone the git repository
 2. in terminal type: "python run arrow.py"
 3. in a new terminal type: curl "http://localhost:8000/search?query=[your+search+query]"
