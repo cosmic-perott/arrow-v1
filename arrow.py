@@ -51,7 +51,6 @@ async def search(query: str = Query(..., description="The search query for the L
 
     raw_results = []
     
-    # 2. Try DuckDuckGo NEWS first (Forces actual articles instead of tool homepages)
     loop = asyncio.get_event_loop()
     try:
         with DDGS() as ddgs:
